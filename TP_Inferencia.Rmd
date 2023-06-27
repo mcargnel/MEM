@@ -1,0 +1,235 @@
+---
+title: "Trabajo Práctico - Simulación"
+author:
+- Rodrigo Castro
+- Martín Cargnel
+subtitle: Inferencia Estadística
+output:
+  html_notebook: default
+  pdf_document: default
+  html_document:
+    df_print: paged
+---
+<style type="text/css">
+
+h1.title {
+  text-align: center;
+}
+h3.subtitle {
+  text-align: center;
+}
+h4.author {
+  text-align: center;
+}
+</style>
+
+# Enunciado
+Una fuente radiactiva emite partículas alfa de acuerdo con un proceso de Poisson de intensidad $\lambda$ por segundo. Se tiene una fuerte sospecha de que el parámetro desconocido supera 0.5, y con el objetivo de confirmar dicha sospecha se medirán los tiempos entre emisiones
+consecutivas, obteniendo de esa manera una muestra de variables aleatorias independientes con distribución $\mathcal{E}(\lambda)$.
+Se proponen dos alternativas, con respecto a la construcción del test de hipótesis:
+
+1. Armar un test de nivel exacto $\alpha$ a partir del estadístico $T_1 = \sum_{i=1}^{n}X_i$.
+2. Armar un test de nivel asintótico $\alpha$ a partir del estadístico $T_2 =\sqrt{n}\frac{\bar{X}-2}{2}$
+
+El objetivo es comparar ambos métodos mediante una simulación en R, para luego elegir uno de ellos y realizar el experimento. Para cada valor de $n\in\{10; 30; 100; 1000\}$ se quiere estudiar el nivel empírico, y compararlo para las dos alternativas propuestas. También se desea aproximar y graficar la función potencia, y comparar.
+
+### Plantear claramente las hipótesis.
+$$
+H_0:\lambda\leq\lambda_0 ~~~~~\text{vs}~~~~~H_1:\lambda>\lambda_0
+$$
+
+### Justificar la elección de los dos estadísticos que propone el enunciado, y determinar sus distribuciones (exacta o asintótica) bajo $H_0$.
+Para $T_1$ tenemos que $f_X(x)=\lambda e^{-\lambda x}$ pertenece a las familias exponenciales con $c(\lambda)=-\lambda$ y $R(x)=x$. Como $c(\lambda)$ es decreciente el test quedaría:
+
+$$\delta(\underline{x})= \left\{ \begin{array}{lcc}
+             1 &   si  & -T_1>k_{\alpha} \\
+             \\ 0 &  si~no
+             \end{array}
+   \right.$$
+pasando el (-) y reemplazando con el estadístico nos queda
+$$\delta(\underline{x})= \left\{ \begin{array}{lcc}
+             1 &   si  & \sum_{i=1}^{n}X_i<k'_{\alpha} \\
+             \\ 0 &  si~no
+             \end{array}
+   \right.$$
+entonces tenemos que para un nivel de $\alpha$ dado
+$$\alpha=\mathbb{P}(\delta(\underline{x})=1)$$
+
+
+Para encontrar $k_{\alpha}$ usamos que si $X\sim\mathcal{E}(\lambda)\Rightarrow{} \sum_{i=1}^{n}X_i\sim\Gamma(n,\lambda)$. En nuestro caso como $\lambda=1/2$ nos quedaría $\sum_{i=1}^{n}X_i\sim\Gamma(n,1/2)\equiv\mathcal{X}^{2}_n$ y nuestra función de potencia se puede escribir de la siguiente manera:
+
+$$\delta(\underline{x})= \left\{ \begin{array}{lcc}
+             1 &   si  & \sum_{i=1}^{n}X_i<\mathcal{X}^{2}_{2n,\alpha} \\
+             \\ 0 &  si~no
+             \end{array}
+   \right.$$
+   
+
+
+
+Para $T_2$ vamos a usar TCL, en nuestro caso tenemos $\lambda=1/2 \Leftrightarrow{} E(X)=2,~~ var(X)=4$ entonces el test quedaría
+$$\delta(\underline{x})= \left\{ \begin{array}{lcc}
+             1 &   si  & \frac{\bar{X}-2}{2\sqrt{n}}<Z_{\alpha} \\
+             \\ 0 &  si~no
+             \end{array}
+   \right.$$
+
+
+
+### Realizar la simulación pedida para los diferentes valores de n, calcular el nivel empírico y expresarlo en una tabla.
+```{r}
+grilla_n <- c(10,30,100,1000)
+Nrep <- 10000
+lambda <- 1/2
+```
+
+```{r}
+rechazo_T1 <- function(n, alpha, muestra){
+  T_1 <- sum(muestra)
+  T_1 < qchisq(alpha, n*2)
+}
+```
+
+```{r}
+rechazo_T2 <- function(n, alpha, muestra){
+  T_2 <- (mean(muestra)-2)/2*sqrt(length(muestra))
+  T_2 < qnorm(alpha)
+}
+```
+
+```{r}
+set.seed(123)
+niv_emp_T1 <- c()
+niv_emp_T2 <- c()
+for (i in grilla_n){
+  resultados_T1 <- c()
+  resultados_T2 <- c()
+  
+  for(j in 1:Nrep){
+  muestra <- rexp(i, lambda)
+  resultados_T1 <- append(resultados_T1, rechazo_T1(i,0.05, muestra))
+  resultados_T2 <- append(resultados_T2, rechazo_T2(i,0.05, muestra))
+  }
+  
+  niv_emp_T1 <- append(niv_emp_T1, mean(resultados_T1))
+  niv_emp_T2 <- append(niv_emp_T2, mean(resultados_T2))
+}
+
+
+resultados_C <- data.frame(n = grilla_n,
+                           niv_emp_T1 = niv_emp_T1,
+                           niv_emp_T2 = niv_emp_T2)
+
+
+resultados_C
+```
+
+### Para cada uno de los valores propuestos de n y eligiendo una grilla de valores para n, aproximar y graficar la función potencia.
+
+```{r}
+grilla_lambda <- seq(0.01, 1, 0.01)
+```
+
+```{r}
+set.seed(123)
+graficar_potencia <- function(n, grilla_lambda){
+  niv_emp_T1 <- c()
+  niv_emp_T2 <- c()
+  
+  for(k in grilla_lambda){
+    resultados_T1 <- c()
+    resultados_T2 <- c()
+    
+    for(j in 1:Nrep){
+    muestra <- rexp(n, k)
+    resultados_T1 <- append(resultados_T1, rechazo_T1(n,0.05, muestra))
+    resultados_T2 <- append(resultados_T2, rechazo_T2(n,0.05, muestra))
+    }
+    
+    niv_emp_T1 <- append(niv_emp_T1, mean(resultados_T1))
+    niv_emp_T2 <- append(niv_emp_T2, mean(resultados_T2))
+  }
+  
+  plot(grilla_lambda, niv_emp_T1, xlim = c(0.01,1), ylim=c(0,1), col="red", type="l", xlab="Lambda", ylab="Nivel empírico", main=paste0("Gráfico de potencia para n=",n))
+  lines(grilla_lambda, niv_emp_T2, col="blue")
+  abline(h=0.05,lty = 2)
+  abline(v=0.5,lty = 2)
+  legend(0.1, 0.85, legend=c("T1", "T2"), fill = c("red","blue"))
+  
+}
+```
+
+```{r}
+par(mfrow=c(2,2))
+for(i in grilla_n){
+  graficar_potencia(i, grilla_lambda)
+}
+
+```
+
+
+```{r}
+set.seed(123)
+potencia_v2 <- function(n, grilla_lambda){
+  niv_emp_T1 <- c()
+  niv_emp_T2 <- c()
+  
+  for(k in grilla_lambda){
+    resultados_T1 <- c()
+    resultados_T2 <- c()
+    
+    for(j in 1:Nrep){
+    muestra <- rexp(n, k)
+    resultados_T1 <- append(resultados_T1, rechazo_T1(n,0.05, muestra))
+    resultados_T2 <- append(resultados_T2, rechazo_T2(n,0.05, muestra))
+    }
+    
+    niv_emp_T1 <- append(niv_emp_T1, mean(resultados_T1))
+    niv_emp_T2 <- append(niv_emp_T2, mean(resultados_T2))
+  }
+  
+  return(list(T1 = niv_emp_T1,T2 =  niv_emp_T2))
+  
+}
+```
+
+```{r}
+set.seed(123)
+plot(grilla_lambda,potencia_v2(10, grilla_lambda)$T1 , xlim = c(0.01,1), ylim=c(0,1), col="black", type="l", xlab="Lambda", ylab="Nivel empírico", main=paste0("Gráfico de potencia para T1"))
+lines(grilla_lambda, potencia_v2(30, grilla_lambda)$T1, col="blue")
+lines(grilla_lambda, potencia_v2(100, grilla_lambda)$T1, col="red")
+lines(grilla_lambda, potencia_v2(1000, grilla_lambda)$T1, col="darkgreen")
+abline(h=0.05,lty = 2)
+abline(v=0.5,lty = 2)
+legend(0.1, 0.85, legend=c("n=10", "n=30", "n=100", "n=1000"), fill = c("black","blue","red","darkgreen"))
+```
+
+
+```{r}
+set.seed(123)
+plot(grilla_lambda,potencia_v2(10, grilla_lambda)$T2 , xlim = c(0.01,1), ylim=c(0,1), col="black", type="l", xlab="Lambda", ylab="Nivel empírico", main=paste0("Gráfico de potencia para T2"))
+lines(grilla_lambda, potencia_v2(30, grilla_lambda)$T2, col="blue")
+lines(grilla_lambda, potencia_v2(100, grilla_lambda)$T2, col="red")
+lines(grilla_lambda, potencia_v2(1000, grilla_lambda)$T2, col="darkgreen")
+abline(h=0.05,lty = 2)
+abline(v=0.5,lty = 2)
+legend(0.1, 0.85, legend=c("n=10", "n=30", "n=100", "n=1000"), fill = c("black","blue","red","darkgreen"))
+
+```
+
+### Concluir en base a los resultados observados
+En base a las simulaciones concluimos que
+
+1. Para $T_1$ los valores empíricos se mantienen similares a 0.05 medida que aumentamos el N, lo cual es razonable dado que se trata de un test exacto. A diferencia de $T_2$ donde vemos que los niveles empíricos se aproximan a 0.05 cuando n aumenta debido a que estamos usando un test de nivel asintótico.
+2. A medida que n aumenta se disminuyen los errores de tipo 1 y 2 en los dos estadísticos. Es decir aumenta la probabilidad de rechazar cuando $\lambda > 0.5$ y baja en caso contrario.
+
+
+
+
+
+
+
+
+
+
+
